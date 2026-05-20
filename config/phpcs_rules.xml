@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<ruleset name="CodeSmellLight">
+    <description>Lightweight PHPCS code smell detection for dataset construction</description>
+
+    <!-- Empty statements (empty if, catch, etc.) -->
+    <rule ref="Generic.CodeAnalysis.EmptyStatement"/>
+
+    <!-- For loops that should be while loops -->
+    <rule ref="Generic.CodeAnalysis.ForLoopShouldBeWhileLoop"/>
+
+    <!-- Function calls in for loop test -->
+    <rule ref="Generic.CodeAnalysis.ForLoopWithTestFunctionCall"/>
+
+    <!-- Jumbled incrementer in for loops -->
+    <rule ref="Generic.CodeAnalysis.JumbledIncrementer"/>
+
+    <!-- if(true) / if(false) -->
+    <rule ref="Generic.CodeAnalysis.UnconditionalIfStatement"/>
+
+    <!-- Unnecessary final modifier -->
+    <rule ref="Generic.CodeAnalysis.UnnecessaryFinalModifier"/>
+
+    <!-- Methods that only call parent -->
+    <rule ref="Generic.CodeAnalysis.UselessOverridingMethod"/>
+
+    <!-- Long lines -->
+    <rule ref="Generic.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="120"/>
+            <property name="absoluteLineLimit" value="200"/>
+        </properties>
+    </rule>
+
+    <!-- Cyclomatic complexity -->
+    <rule ref="Generic.Metrics.CyclomaticComplexity"/>
+
+    <!-- Nesting level -->
+    <rule ref="Generic.Metrics.NestingLevel"/>
+
+    <!-- Commented out code -->
+    <rule ref="Squiz.PHP.CommentedOutCode"/>
+
+    <!-- Exclude test and vendor dirs -->
+    <exclude-pattern>*/test/*</exclude-pattern>
+    <exclude-pattern>*/tests/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+</ruleset>

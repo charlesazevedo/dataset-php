@@ -1,0 +1,13 @@
+{
+    "name": "codesmell-dataset/php-tools",
+    "description": "Dependências PHP para extração e análise de snippets",
+    "require": {
+        "php": ">=8.1",
+        "nikic/php-parser": "^5.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
+}

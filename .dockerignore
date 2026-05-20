@@ -1,0 +1,34 @@
+# Repositórios clonados (serão montados via volume)
+repos/
+
+# Outputs (serão montados via volume)
+output/
+
+# Ferramentas baixadas localmente (serão instaladas no container)
+tools/
+
+# Vendor PHP (será instalado no container)
+config/vendor/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker próprios (evitar loops)
+docker-compose.override.yml
+
+# Docs desnecessários no build
+*.md
+!GUIA_DOCKER.md
+LICENSE

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<ruleset name="CodeSmells"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>Code smell detection rules for dataset construction</description>
+
+    <!-- Cleancode rules (static access, else expression, boolean argument) -->
+    <rule ref="rulesets/cleancode.xml" />
+
+    <!-- Code Size rules (Long Method, God Class, Too Many Methods, etc.) -->
+    <rule ref="rulesets/codesize.xml" />
+
+    <!-- Design rules (coupling, depth of inheritance, etc.) -->
+    <rule ref="rulesets/design.xml" />
+
+    <!-- Naming rules (short/long variable names, method names, etc.) -->
+    <rule ref="rulesets/naming.xml" />
+
+    <!-- Unused Code rules (Dead Code detection) -->
+    <rule ref="rulesets/unusedcode.xml" />
+
+    <!-- Controversial rules (superglobals, camelCase, etc.) -->
+    <rule ref="rulesets/controversial.xml" />
+</ruleset>

@@ -1,0 +1,228 @@
+# =============================================================================
+# docker-compose.yml — Pipeline de Construção de Dataset de Code Smells PHP
+# =============================================================================
+#
+# Uso básico:
+#   docker compose up setup          # Verificar ambiente
+#   docker compose up run-all        # Executar todas as fases
+#   docker compose run shell         # Terminal interativo
+#   docker compose up interface      # Interface web na porta 8080
+#
+# Com repositório específico:
+#   REPO=laravel/framework docker compose up run-all
+#
+# =============================================================================
+
+services:
+  # ─────────────────────────────────────────────────────────────
+  # Serviço base (não executado diretamente)
+  # ─────────────────────────────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: codesmell-pipeline:latest
+    volumes:
+      - ./output:/app/output
+      - ./repos:/app/repos
+      - ./interface:/app/interface
+      - ./scripts:/app/scripts  # bind-mount: scripts editados no host valem no container sem rebuild
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - SONAR_TOKEN=${SONAR_TOKEN:-}
+      - SONAR_ORG=${SONAR_ORG:-}
+      - REPO=${REPO:-}
+      - PHP_MEMORY_LIMIT=${PHP_MEMORY_LIMIT:-512M}
+      - PYTHONUNBUFFERED=1
+    working_dir: /app
+    profiles:
+      - never  # Não sobe com "docker compose up"
+
+  # ─────────────────────────────────────────────────────────────
+  # SonarQube Server (Community Edition, análise local)
+  # ─────────────────────────────────────────────────────────────
+  sonarqube:
+    image: sonarqube:community
+    container_name: codesmell-sonarqube
+    ports:
+      - "${SONAR_PORT:-9000}:9000"
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+      - SONAR_TELEMETRY_ENABLE=false
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/api/system/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+    profiles:
+      - fase3
+      - sonar
+
+  # ─────────────────────────────────────────────────────────────
+  # Setup: verifica e prepara o ambiente
+  # ─────────────────────────────────────────────────────────────
+  setup:
+    extends:
+      service: app
+    container_name: codesmell-setup
+    command: bash /app/docker/docker-setup.sh
+    profiles:
+      - setup
+
+  # ─────────────────────────────────────────────────────────────
+  # Run All: executa todas as 5 fases
+  # ─────────────────────────────────────────────────────────────
+  run-all:
+    extends:
+      service: app
+    container_name: codesmell-run-all
+    command: bash /app/docker/docker-run-all.sh
+    profiles:
+      - run
+
+  # ─────────────────────────────────────────────────────────────
+  # Fases individuais
+  # ─────────────────────────────────────────────────────────────
+  fase1:
+    extends:
+      service: app
+    container_name: codesmell-fase1
+    command: >
+      bash -c '
+        echo "═══ FASE 1 — Seleção do Repositório ═══"
+        if [ -n "$${AUTO_SELECT}" ]; then
+          python3 scripts/fase1_selecionar_repositorio.py --auto-select "$${AUTO_SELECT}" --output output/fase1
+        elif [ -n "$${REPO}" ]; then
+          python3 scripts/fase1_selecionar_repositorio.py --repo "$${REPO}" --output output/fase1
+        else
+          python3 scripts/fase1_selecionar_repositorio.py --output output/fase1
+        fi
+      '
+    profiles:
+      - fase1
+
+  fase2:
+    extends:
+      service: app
+    container_name: codesmell-fase2
+    command: >
+      bash -c '
+        echo "═══ FASE 2 — Extração de Snippets ═══";
+        REPO_NAME=$$(jq -r ".repo_name" output/fase1/repositorio_metadata.json | tr "/" "_");
+        REPO_URL=$$(jq -r ".github_url" output/fase1/repositorio_metadata.json);
+        REPO_DIR="repos/$${REPO_NAME}";
+        if [ ! -d "$${REPO_DIR}" ]; then git clone --depth 1 "$${REPO_URL}.git" "$${REPO_DIR}"; fi;
+        php scripts/fase2_extrair_snippets.php "$${REPO_DIR}"
+      '
+    profiles:
+      - fase2
+
+  fase3:
+    extends:
+      service: app
+    container_name: codesmell-fase3
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    command: >
+      bash -c '
+        echo "═══ FASE 3 — Análise Estática ═══";
+        REPO_NAME=$$(jq -r ".repo_name" output/fase1/repositorio_metadata.json | tr "/" "_");
+        bash scripts/fase3_analise_estatica.sh "repos/$${REPO_NAME}" output/fase2/snippets_com_metricas.json
+      '
+    profiles:
+      - fase3
+
+  fase4:
+    extends:
+      service: app
+    container_name: codesmell-fase4
+    command: >
+      bash -c '
+        echo "═══ FASE 4 — Interface de Anotação ═══"
+        python3 scripts/fase4_preparar_interface.py \
+          --snippets output/fase2/snippets_com_metricas.json \
+          --labels output/fase3/pre_rotulacao.json \
+          --output output/fase4
+      '
+    profiles:
+      - fase4
+
+  fase5:
+    extends:
+      service: app
+    container_name: codesmell-fase5
+    command: >
+      bash -c '
+        echo "═══ FASE 5 — Validação e Dataset Final ═══"
+        ANN_ARGS=""
+        if [ -f "output/fase4/anotacoes_final.json" ]; then
+          ANN_ARGS="--annotations output/fase4/anotacoes_final.json"
+          echo "  Usando anotações manuais (com desempate)"
+        elif [ -f "output/fase4/anotacoes_consolidadas.json" ]; then
+          ANN_ARGS="--annotations output/fase4/anotacoes_consolidadas.json"
+          echo "  Usando anotações consolidadas (sem desempate)"
+        else
+          echo "  Anotações manuais não encontradas — usando pré-rótulos automáticos"
+        fi
+        python3 scripts/fase5_validar_dataset.py \
+          --fase1 output/fase1/repositorio_metadata.json \
+          --fase2 output/fase2/snippets_com_metricas.json \
+          --fase3 output/fase3/pre_rotulacao.json \
+          --output output/fase5 \
+          $${ANN_ARGS}
+      '
+    profiles:
+      - fase5
+
+  # ─────────────────────────────────────────────────────────────
+  # Interface Web (porta 8080)
+  # ─────────────────────────────────────────────────────────────
+  interface:
+    extends:
+      service: app
+    container_name: codesmell-interface
+    ports:
+      - "${INTERFACE_PORT:-8080}:8080"
+    command: >
+      bash -c '
+        echo "═══ Interface de Anotação ═══"
+        echo "Acessível em: http://localhost:${INTERFACE_PORT:-8080}"
+        echo ""
+        SERVE_DIR="output/fase4"
+        if [ -f "$$SERVE_DIR/interface_anotacao.html" ]; then
+          cd "$$SERVE_DIR"
+          python3 -m http.server 8080
+        else
+          echo "⚠ Interface ainda não foi gerada."
+          echo "  Execute primeiro: docker compose --profile run up run-all"
+          echo "  Ou: docker compose --profile fase4 up fase4"
+          echo ""
+          echo "  Servindo diretório output/ enquanto isso..."
+          cd /app/output
+          python3 -m http.server 8080
+        fi
+      '
+    profiles:
+      - interface
+
+  # ─────────────────────────────────────────────────────────────
+  # Shell interativo
+  # ─────────────────────────────────────────────────────────────
+  shell:
+    extends:
+      service: app
+    container_name: codesmell-shell
+    stdin_open: true
+    tty: true
+    command: bash
+    profiles:
+      - shell
+
+volumes:
+  sonarqube_data:
+  sonarqube_logs:
