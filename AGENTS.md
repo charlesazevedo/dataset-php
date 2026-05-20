@@ -121,3 +121,8 @@ ls repos/
 - `docs/guia_docker.md` — guia completo de execução com Docker
 - `docs/fases/` — documentação técnica detalhada de cada fase do pipeline
 - `Makefile` — `make help` lista todos os comandos disponíveis
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
