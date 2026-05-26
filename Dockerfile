@@ -100,13 +100,14 @@ COPY --from=composer-deps --chown=codesmell:codesmell /app/config/vendor /app/co
 # Copiar arquivos do projeto
 COPY --chown=codesmell:codesmell config/ /app/config/
 COPY --chown=codesmell:codesmell scripts/ /app/scripts/
+COPY --chown=codesmell:codesmell docker/ /app/docker/
 # Instalar dependências Python (sem venv, estamos em container)
 RUN pip3 install --no-cache-dir --break-system-packages -r /app/config/requirements.txt 2>/dev/null \
     || pip3 install --no-cache-dir -r /app/config/requirements.txt
 
 # Permissões de execução
-RUN chmod +x /app/scripts/*.sh /app/scripts/*.py 2>/dev/null || true \
-    && chmod +x /app/docker/*.sh
+RUN (chmod +x /app/scripts/*.sh /app/scripts/*.py 2>/dev/null || true) \
+    && (chmod +x /app/docker/*.sh 2>/dev/null || true)
 
 # Criar estrutura de output
 RUN mkdir -p /app/output/fase{1,2,3,4,5} \
